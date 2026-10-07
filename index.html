@@ -371,9 +371,6 @@ transform: scale(1.2);
   100% { transform: scale(1) rotate(0deg); clip-path: none; }
 }
 
-.passcode-heart.heart-broken {
-  animation: heartShatterBreak 0.65s ease-in-out forwards;
-}
 .passcode-heart.heart-broken svg {
   fill: #ef4444 !important;
   stroke: #dc2626 !important;
@@ -618,10 +615,14 @@ Collection of letters, songs, and stories compiled with you in mind.
 <span class="text-[9px] font-mono uppercase tracking-widest text-amber-300 font-bold block">Now Playing Tape</span>
 </div>
 <p id="persistent-song-title" class="text-xs font-bold truncate">Mixtape Track</p>
-<div class="flex items-center gap-2 pt-1">
+<div class="flex items-center gap-2 pt-1 flex-wrap">
+<button id="persistent-play-pause-btn" onclick="togglePlayPauseAudio()" class="text-[10px] bg-amber-500 hover:bg-amber-600 text-stone-950 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 font-mono font-bold">
+<i data-lucide="pause" class="w-3 h-3"></i>
+<span id="persistent-play-pause-label">Pause</span>
+</button>
 <button onclick="togglePersistentAudioPlayer()" class="text-[10px] bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg text-stone-200 transition-colors flex items-center gap-1 font-mono">
 <i data-lucide="minimize-2" class="w-3 h-3"></i>
-<span id="persistent-minimize-label">Minimize Video</span>
+<span id="persistent-minimize-label">Minimize</span>
 </button>
 <button onclick="stopPersistentAudioPlayer()" class="text-[10px] bg-rose-500/30 hover:bg-rose-500/50 text-rose-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 font-mono">
 <i data-lucide="x" class="w-3 h-3"></i>
@@ -1222,6 +1223,7 @@ let activeTab = 'intro';
 let activeSongCategory = 'all';
 let vinylPinInserted = {};
 let passcodeBuffer = "";
+let isAudioPlaying = false;
 
 function pressPasscodeNum(digit) {
 if (passcodeBuffer.length < 4) {
@@ -1251,6 +1253,15 @@ dot.classList.remove('filled');
 }
 }
 }
+ updatePasscodeThemeColor();
+}
+
+function updatePasscodeThemeColor() {
+  const themeAccent = appData.theme?.accentColor || '#B82C38';
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    if (dot) dot.style.setProperty('--accent-color', themeAccent);
+  }
 }
 
 function verifyIphonePasscode() {
@@ -1437,6 +1448,7 @@ document.documentElement.style.setProperty('--card-bg', theme.cardBg || '#FFFFFF
 document.documentElement.style.setProperty('--border-color', (theme.accentColor || '#B82C38') + '33');
 document.documentElement.style.setProperty('--opening-bg', theme.openingBg || '#1c1917');
 document.documentElement.style.setProperty('--opening-text', theme.openingText || '#fff8f6');
+updatePasscodeThemeColor();
 
 if (activeTab === 'moons') {
 document.body.style.backgroundColor = theme.moonsBg || '#07060d';
@@ -1873,14 +1885,43 @@ const wrapper = document.getElementById('persistent-audio-wrapper');
 const titleEl = document.getElementById('persistent-song-title');
 const videoId = extractVideoId(ytUrl);
 if (host && videoId) {
-host.innerHTML = `<iframe class="w-full h-full rounded-xl" src="https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1" title="${escapeHtml(songTitle)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
+host.innerHTML = `<iframe id="persistent-yt-iframe" class="w-full h-full rounded-xl pointer-events-auto" src="https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&rel=0&playsinline=1&modestbranding=1" title="${escapeHtml(songTitle)}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`;
 if (wrapper) {
 wrapper.classList.remove('hidden');
 wrapper.style.display = 'flex';
 }
 if (titleEl) titleEl.innerText = songTitle || "Dedicated Track";
+isAudioPlaying = true;
+updatePlayPauseButtonUI(true);
 if (window.lucide) lucide.createIcons();
 }
+}
+
+function togglePlayPauseAudio() {
+const iframe = document.getElementById('persistent-yt-iframe');
+if (!iframe || !iframe.contentWindow) return;
+if (isAudioPlaying) {
+iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+isAudioPlaying = false;
+updatePlayPauseButtonUI(false);
+} else {
+iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+isAudioPlaying = true;
+updatePlayPauseButtonUI(true);
+}
+}
+
+function updatePlayPauseButtonUI(playing) {
+const btn = document.getElementById('persistent-play-pause-btn');
+if (!btn) return;
+if (playing) {
+btn.className = "text-[10px] bg-amber-500 hover:bg-amber-600 text-stone-950 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 font-mono font-bold";
+btn.innerHTML = `<i data-lucide="pause" class="w-3 h-3"></i><span id="persistent-play-pause-label">Pause</span>`;
+} else {
+btn.className = "text-[10px] bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 font-mono font-bold";
+btn.innerHTML = `<i data-lucide="play" class="w-3 h-3"></i><span id="persistent-play-pause-label">Play</span>`;
+}
+if (window.lucide) lucide.createIcons();
 }
 
 function togglePersistentAudioPlayer() {
@@ -1889,10 +1930,10 @@ const label = document.getElementById('persistent-minimize-label');
 if (host) {
 if (host.classList.contains('hidden')) {
 host.classList.remove('hidden');
-if (label) label.innerText = "Minimize Video";
+if (label) label.innerText = "Minimize";
 } else {
 host.classList.add('hidden');
-if (label) label.innerText = "Expand Video";
+if (label) label.innerText = "Expand";
 }
 }
 }
@@ -1905,6 +1946,7 @@ if (wrapper) {
 wrapper.classList.add('hidden');
 wrapper.style.display = 'none';
 }
+isAudioPlaying = false;
 }
 
 function handleCustomizeClick() {
